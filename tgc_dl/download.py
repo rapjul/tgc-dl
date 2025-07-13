@@ -12,6 +12,7 @@ from m3u8 import parse as m3u8_parse
 from more_itertools import unique
 from requests_cache import CachedSession
 from rich import print
+from typing_extensions import deprecated
 
 from .types import HEADERS, Course, Lecture, LineCount, Video
 
@@ -848,6 +849,7 @@ def download_lecture(
                 quit()
 
 
+@deprecated("Use the `download_lecture()` function instead.")
 def download_file(
     course: Course,
     video: Video,
