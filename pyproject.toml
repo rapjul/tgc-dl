@@ -1,17 +1,17 @@
 [project]
 name = "tgc-dl"
 description = "Download courses from The Great Courses Plus."
-version = "1.0.0"
+readme = "README.md"
+version = "1.0.1"
 requires-python = ">=3.10,<4.0"
 dependencies = [
     "bs4>=0.0.2",
     "m3u8>=6.0.0",
-    "pycaption>=2.2.16",
     "requests>=2.32.4",
     "requests-cache>=1.2.1",
     "rich>=14.0.0",
     "typer>=0.16.0",
-    "yt-dlp>=2025.6.30",
+    "yt-dlp",
 ]
 
 [project.scripts]
