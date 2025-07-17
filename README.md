@@ -19,29 +19,15 @@ A command-line interface (CLI) tool to download courses, lectures, and guidebook
 
 *   Python 3.10+
 *   `ffmpeg` (for merging video and audio streams)
+*   `ffproble` (for detecting if a file has a video or an audio stream)
 
 You can install `ffmpeg` via your system's package manager (e.g., `brew install ffmpeg` on macOS, `sudo apt-get install ffmpeg` on Debian/Ubuntu) or download it from the [official FFmpeg website](https://ffmpeg.org/download.html).
 
-### Using `pip`
+### Using `uv`
 
 ```bash
-pip install tgc-dl
+uv tool install tgc-dl
 ```
-
-### From Source
-
-1.  Clone the repository:
-
-    ```bash
-    git clone https://github.com/your-username/tgc-dl.git
-    cd tgc-dl
-    ```
-
-2.  Install dependencies:
-
-    ```bash
-    pip install -e .
-    ```
 
 ## Usage
 
@@ -61,7 +47,6 @@ tgc-dl [OPTIONS] COURSE_URLS...
 *   `--output-directory`, `-o`: Path to where the downloads will be stored. (Default: Current working directory)
 *   `--quality`, `-q`: Quality of the video to download (min: 360, max: 1080). (Default: 1080)
 *   `--lecture-range`, `-r`: Download a specific range of lectures (e.g., `'1-5'`, `'3'`, `'1,3,5'`). Only applicable when downloading a single course.
-*   `--streaming-output`, `-s`: Stream the output from FFMPEG as it is running. (Default: `False`)
 *   `--debug`, `-d`: Print debug statements. (Default: `False`)
 *   `--dry-run`, `-n`: Dry-run; does not download anything. (Default: `False`)
 
