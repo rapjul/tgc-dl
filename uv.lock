@@ -230,6 +230,15 @@ wheels = [
 ]
 
 [[package]]
+name = "more-itertools"
+version = "10.7.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/ce/a0/834b0cebabbfc7e311f30b46c8188790a37f89fc8d756660346fe5abfd09/more_itertools-10.7.0.tar.gz", hash = "sha256:9fddd5403be01a94b204faadcff459ec3568cf110265d3c54323e1e866ad29d3", size = 127671, upload-time = "2025-04-22T14:17:41.838Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2b/9f/7ba6f94fc1e9ac3d2b853fdff3035fb2fa5afbed898c4a72b8a020610594/more_itertools-10.7.0-py3-none-any.whl", hash = "sha256:d43980384673cb07d2f7d2d918c616b30c659c089ee23953f601d6609c67510e", size = 65278, upload-time = "2025-04-22T14:17:40.49Z" },
+]
+
+[[package]]
 name = "platformdirs"
 version = "4.3.8"
 source = { registry = "https://pypi.org/simple" }
@@ -318,6 +327,7 @@ source = { editable = "." }
 dependencies = [
     { name = "bs4" },
     { name = "m3u8" },
+    { name = "more-itertools" },
     { name = "requests" },
     { name = "requests-cache" },
     { name = "rich" },
@@ -329,6 +339,7 @@ dependencies = [
 requires-dist = [
     { name = "bs4", specifier = ">=0.0.2" },
     { name = "m3u8", specifier = ">=6.0.0" },
+    { name = "more-itertools", specifier = ">=10.7.0" },
     { name = "requests", specifier = ">=2.32.4" },
     { name = "requests-cache", specifier = ">=1.2.1" },
     { name = "rich", specifier = ">=14.0.0" },
