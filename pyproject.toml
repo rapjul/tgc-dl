@@ -2,8 +2,10 @@
 name = "tgc-dl"
 description = "Download courses from The Great Courses Plus."
 readme = "README.md"
-version = "1.0.1"
+version = "1.0.1.2"
 requires-python = ">=3.10,<4.0"
+license = "MIT"
+license-files = ["LICENSE"]
 dependencies = [
     "bs4>=0.0.2",
     "m3u8>=6.0.0",
@@ -14,6 +16,34 @@ dependencies = [
     "typer>=0.16.0",
     "yt-dlp",
 ]
+keywords = [
+    "download",
+    "downloads",
+    "downloader",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    # "Intended Audience :: Developers",
+    "Intended Audience :: End Users/Desktop",
+    "Intended Audience :: Education",
+    "License :: OSI Approved :: MIT License",
+    "Natural Language :: English",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: Implementation :: CPython",
+    # "Programming Language :: Python :: Implementation :: PyPy",
+    "Topic :: Internet",
+    "Topic :: Multimedia :: Video",
+    "Topic :: Utilities",
+]
+
+[project.urls]
+Homepage = "https://github.com/rapjul/tgc-dl"
+Documentation = "https://github.com/rapjul/tgc-dl/blob/main/README.md"
 
 [project.scripts]
 tgc-dl = "tgc_dl.main:app"
@@ -21,3 +51,8 @@ tgc-dl = "tgc_dl.main:app"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.ruff]
+indent-width = 4
+# line-length = 88
+fix = true
