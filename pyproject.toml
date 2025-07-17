@@ -2,7 +2,7 @@
 name = "tgc-dl"
 description = "Download courses from The Great Courses Plus."
 version = "1.0.0"
-requires-python = ">=3.9,<4.0"
+requires-python = ">=3.10,<4.0"
 dependencies = [
     "bs4>=0.0.2",
     "m3u8>=6.0.0",
@@ -10,11 +10,12 @@ dependencies = [
     "requests>=2.32.4",
     "requests-cache>=1.2.1",
     "rich>=14.0.0",
+    "typer>=0.16.0",
     "yt-dlp>=2025.6.30",
 ]
 
 [project.scripts]
-tgc-dl = "tgc_dl.main:main"
+tgc-dl = "tgc_dl.main:app"
 
 [build-system]
 requires = ["hatchling"]

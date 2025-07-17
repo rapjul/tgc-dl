@@ -1,6 +1,5 @@
 import json
 import logging
-import os
 import re
 import shutil
 import subprocess
@@ -12,19 +11,10 @@ from m3u8 import parse as m3u8_parse
 from more_itertools import unique
 from requests_cache import CachedSession
 from rich import print
+from typer import Exit
 from typing_extensions import deprecated
 
 from .types import HEADERS, Course, Lecture, LineCount, Video
-
-# from pycaption import (
-#     DFXPWriter,
-#     SCCReader,
-#     SCCWriter,
-#     SRTReader,
-#     SRTWriter,
-#     WebVTTWriter,
-# )
-
 
 session = CachedSession(
     "the_great_courses_plus",
@@ -35,10 +25,10 @@ session = CachedSession(
 
 def download(
     course: Course,
-    cookies: dict,
-    quality: int,
-    offset: int,
+    lectures_to_download: list[Lecture],
     output_directory: Path,
+    quality: int,
+    cookies: dict,
     logger: logging.Logger,
     streaming_output: bool = True,
 ) -> None:
@@ -50,10 +40,10 @@ def download(
     available video resolution and corresponding audio track, and downloads the lecture using the selected streams.
     Args:
         course (Course): The course object containing lecture information.
-        cookies (dict): Dictionary of cookies for authentication with the server.
-        quality (int): Desired video quality (height in pixels).
-        offset (int): Number of lectures to skip before starting download.
+        lectures_to_download (List[Lecture]): A list of Lecture objects to download.
         output_directory (Path): Directory where downloaded files will be saved.
+        quality (int): Desired video quality (height in pixels).
+        cookies (dict): Dictionary of cookies for authentication with the server.
         logger (logging.Logger): Logger instance for logging progress and errors.
         streaming_output (bool, optional): If True, enables streaming output during download. Defaults to True.
     Returns:
@@ -66,135 +56,129 @@ def download(
     )
 
     logger.info("Grabbing Lectures...")
-    numb = 1
     lecture: Lecture
-    for lecture in course.lectures:
+    for lecture in lectures_to_download:
         if is_lecture_downloaded(
             course, lecture, output_directory, file_extension="mkv"
         ) or is_lecture_downloaded(
             course, lecture, output_directory, file_extension="mp4"
         ):
             logger.info(
-                f"Lecture {lecture.number:02}) '{lecture.title}' already downloaded. Skipping."
+                f'Lecture {lecture.number_formatted}) "{lecture.title}" already downloaded. Skipping.'
             )
             continue
 
-        if numb < offset != 999:
-            numb += 1
-            logger.info(f"Ignoring Lecture {lecture.number:02} due to offset.")
-        else:
-            numb += 1
-            logger.info(f"Grabbing Lecture {lecture.number:02}...")
-            logger.debug(f"Manifest URL: '{lecture.manifest_url}'")
+        logger.info(
+            f'Grabbing Lecture {lecture.number_formatted} - "{lecture.title}"...'
+        )
+        logger.debug(f"Manifest URL: '{lecture.manifest_url}'")
 
-            if not lecture.manifest_url:
-                logger.error(
-                    f"Skipping lecture {lecture.number:02} because manifest URL is missing."
-                )
-                continue
-
-            # The manifest URL now directly points to the m3u8 playlist
-            try:
-                logger.debug(
-                    f"Attempting to fetch manifest for lecture {lecture.number:02}"
-                )
-                lecture_manifest_response = session.get(
-                    lecture.manifest_url, cookies=cookies, headers=HEADERS
-                )
-                lecture_manifest_response.raise_for_status()  # Raise an exception for HTTP errors
-                logger.debug(
-                    f"Successfully fetched manifest for lecture {lecture.number:02}"
-                )
-
-                playlist_dict = m3u8_parse(lecture_manifest_response.text)
-                logger.debug(playlist_dict)
-                lecture_uri: str = lecture_manifest_response.url.removesuffix(
-                    "master.m3u8"
-                )
-                # logger.debug(f"{lecture_uri=}")
-                lecture.lecture_uri = lecture_uri
-            except requests.exceptions.RequestException as e:
-                logger.error(
-                    f"Network or HTTP error downloading lecture {lecture.number:02}: {e}"
-                )
-                continue
-            except Exception as e:
-                logger.error(
-                    f"An unexpected error occurred while processing lecture {lecture.number:02}: {e}"
-                )
-                continue
-
-            # headers = []
-            # for key, value in HEADERS.items():
-            #     temp = '"' + key + ":" + value + '"'
-            #     # headers.append('--header')
-            #     headers.append("--header=" + temp)
-
-            selected_video = Video()
-
-            playlist: dict
-            for playlist in playlist_dict["playlists"]:
-                # Check if it's a video playlist by looking for 'resolution' in 'stream_info'
-                if (
-                    "stream_info" in playlist
-                    and "resolution" in playlist["stream_info"]
-                ):
-                    video_url = lecture_uri + playlist["uri"]
-
-                    resolution = playlist["stream_info"]["resolution"]
-                    # Extract height from resolution string (e.g., "854x480" -> 480)
-                    if (
-                        resolution := int(resolution.split("x")[1])
-                    ) > selected_video.video_height:
-                        selected_video.video_height = resolution
-                        selected_video.url_video = video_url
-                        # logger.debug(f"{resolution=}: {video_url=}")
-                    # logger.debug(f"{resolution=}", f"{largest_video_resolution=}")
-
-            audio_tracks: list[dict] = [
-                media_track
-                for media_track in playlist_dict["media"]
-                if media_track["type"] == "AUDIO"
-            ]
-            # logger.debug(f"{audio_tracks=}")
-            if len(audio_tracks) == 1:
-                audio_channels = audio_tracks[0]["channels"]
-                audio_link = lecture_uri + audio_tracks[0]["uri"]
-                selected_video.url_audio = audio_link
-                selected_video.audio_channels = audio_channels
-            elif len(audio_tracks) >= 2:
-                raise Exception(
-                    "MoreThanOneAudioLinkError", "Too many audio links were found."
-                )
-            else:
-                raise Exception("NoAudioLinksError", "No audio links found.")
-            logger.debug(f"{selected_video=}")
-            # exit()
-
-            if selected_video.url_video is None:
-                logger.warning(f"No video link found for Lecture {lecture.number:02}.")
-                continue
-            if selected_video.url_audio is None:
-                logger.warning(f"No audio link found for Lecture {lecture.number:02}.")
-                continue
-
-            download_lecture(
-                course=course,
-                lecture=lecture,
-                video=selected_video,
-                output_directory=output_directory,
-                logger=logger,
-                streaming_output=streaming_output,
-                use_ffmpeg=False,
+        if not lecture.manifest_url:
+            logger.error(
+                f"Skipping lecture {lecture.number_formatted} because manifest URL is missing."
             )
-            # aria_out = download_file(
-            #     course,
-            #     selected_video,
-            #     lecture,
-            #     cookies,
-            #     headers=HEADERS,
-            #     logger=logger,
-            # )
+            continue
+
+        # The manifest URL now directly points to the m3u8 playlist
+        try:
+            logger.debug(
+                f"Attempting to fetch manifest for lecture {lecture.number_formatted}"
+            )
+            lecture_manifest_response = session.get(
+                lecture.manifest_url, cookies=cookies, headers=HEADERS
+            )
+            lecture_manifest_response.raise_for_status()  # Raise an exception for HTTP errors
+            logger.debug(
+                f"Successfully fetched manifest for lecture {lecture.number_formatted}"
+            )
+
+            playlist_dict = m3u8_parse(lecture_manifest_response.text)
+            logger.debug(playlist_dict)
+            lecture_uri: str = lecture_manifest_response.url.removesuffix("master.m3u8")
+            # logger.debug(f"{lecture_uri=}")
+            lecture.lecture_uri = lecture_uri
+        except requests.exceptions.RequestException as e:
+            logger.error(
+                f"Network or HTTP error downloading lecture {lecture.number_formatted}: {e}"
+            )
+            continue
+        except Exception as e:
+            logger.error(
+                f"An unexpected error occurred while processing lecture {lecture.number_formatted}: {e}"
+            )
+            continue
+
+        # headers = []
+        # for key, value in HEADERS.items():
+        #     temp = '"' + key + ":" + value + '"'
+        #     # headers.append('--header')
+        #     headers.append("--header=" + temp)
+
+        selected_video = Video()
+
+        playlist: dict
+        for playlist in playlist_dict["playlists"]:
+            # Check if it's a video playlist by looking for 'resolution' in 'stream_info'
+            if "stream_info" in playlist and "resolution" in playlist["stream_info"]:
+                video_url = lecture_uri + playlist["uri"]
+
+                resolution = playlist["stream_info"]["resolution"]
+                # Extract height from resolution string (e.g., "854x480" -> 480)
+                if (
+                    resolution := int(resolution.split("x")[1])
+                ) > selected_video.video_height:
+                    selected_video.video_height = resolution
+                    selected_video.url_video = video_url
+                    # logger.debug(f"{resolution=}: {video_url=}")
+                # logger.debug(f"{resolution=}", f"{largest_video_resolution=}")
+
+        audio_tracks: list[dict] = [
+            media_track
+            for media_track in playlist_dict["media"]
+            if media_track["type"] == "AUDIO"
+        ]
+        # logger.debug(f"{audio_tracks=}")
+        if len(audio_tracks) == 1:
+            audio_channels = audio_tracks[0]["channels"]
+            audio_link = lecture_uri + audio_tracks[0]["uri"]
+            selected_video.url_audio = audio_link
+            selected_video.audio_channels = audio_channels
+        elif len(audio_tracks) >= 2:
+            raise Exception(
+                "MoreThanOneAudioLinkError", "Too many audio links were found."
+            )
+        else:
+            raise Exception("NoAudioLinksError", "No audio links found.")
+        logger.debug(f"{selected_video=}")
+
+        if selected_video.url_video is None:
+            logger.warning(
+                f"No video link found for Lecture {lecture.number_formatted}."
+            )
+            continue
+        if selected_video.url_audio is None:
+            logger.warning(
+                f"No audio link found for Lecture {lecture.number_formatted}."
+            )
+            continue
+
+        download_lecture(
+            course=course,
+            lecture=lecture,
+            video=selected_video,
+            output_directory=output_directory,
+            logger=logger,
+            streaming_output=streaming_output,
+            use_ffmpeg=False,
+        )
+        # aria_out = download_file(
+        #     course,
+        #     selected_video,
+        #     lecture,
+        #     cookies,
+        #     headers=HEADERS,
+        #     logger=logger,
+        # )
 
 
 def count_digits_in_number(value: int) -> int:
@@ -228,7 +212,7 @@ def get_lecture_output_path(
     Returns:
         Path: The complete path to the output video file, including the filename.
     """
-    video_filename = f"{course.title} (#{course.ids}) S01E{lecture.number:02} - {lecture.title_formatted_filename}.{file_extension}"
+    video_filename = f"{course.title} (#{course.ids}) S01E{lecture.number_formatted} - {lecture.title_formatted_filename}.{file_extension}"
     return output_directory.joinpath(video_filename)
 
 
@@ -272,6 +256,7 @@ def download_guidebook(
         ValueError: If the aria2c download (commented out) fails.
     """
     guidebook_url = course.guidebook_url
+    logger.debug(f"{guidebook_url=}")
     if not guidebook_url:
         logger.warning(
             "No Guidebook URL found for this course. Skipping Guidebook download."
@@ -319,7 +304,9 @@ def download_guidebook(
     #         raise ValueError(f"aria2c failed with exit code {aria_process}")
 
     if not (
-        guidebook_url.startswith("https://www.thegreatcoursesplus.com/pdf/")
+        guidebook_url.startswith(
+            "https://www.thegreatcoursesplus.com/pdf/index/index/docName/"
+        )
         and guidebook_url.endswith("/")
     ):
         logger.warning(
@@ -327,9 +314,7 @@ def download_guidebook(
         )
         return
     if not (
-        match := re.search(
-            r"/pdf/index/index/docName/(?P<id>[^\.]+)\.pdf/", guidebook_url
-        )
+        match := re.search(r"/(?P<id>[^\.]+)\.pdf/", guidebook_url, flags=re.IGNORECASE)
     ):
         logger.warning(
             "No Guidebook URL found for this course. Skipping Guidebook download."
@@ -352,6 +337,7 @@ def download_guidebook(
             for chunk in track(
                 response.iter_content(chunk_size=5),
                 description="Downloading Guidebook...",
+                show_speed=False,
             ):
                 f.write(chunk)
     except requests.Timeout as e:
@@ -460,7 +446,9 @@ def download_lecture(
     output_file = get_lecture_output_path(
         course, lecture, output_directory, file_extension="mkv"
     )
-    logger.info(f"Downloading Lecture {lecture.number_formatted} to '{output_file}'...")
+    logger.debug(
+        f"Downloading Lecture {lecture.number_formatted} to '{output_file}'..."
+    )
     video_filename = output_file.stem
     if not output_file.parent.exists():
         output_file.parent.mkdir(parents=True)
@@ -605,7 +593,7 @@ def download_lecture(
                 logger.debug(f"STDOUT:\n{stdout}")
         except KeyboardInterrupt:
             logger.warning(
-                f"Stopped downloading! This program was last downloading Lecture {lecture.number:02}."
+                f"Stopped downloading! This program was last downloading Lecture {lecture.number_formatted}."
             )
             quit()
     else:
@@ -744,12 +732,16 @@ def download_lecture(
                 stream_info = stream_info_cache.get(filename_str, {})
 
                 if stream_info.get("audio") and not stream_info.get("video"):
-                    task_description = f"Downloading Lecture {lecture.number:02} Audio"
+                    task_description = (
+                        f"Downloading Lecture {lecture.number_formatted} Audio"
+                    )
                 elif stream_info.get("video"):
-                    task_description = f"Downloading Lecture {lecture.number:02} Video"
+                    task_description = (
+                        f"Downloading Lecture {lecture.number_formatted} Video"
+                    )
                 else:
                     task_description = (
-                        f"Downloading File for Lecture {lecture.number:02}"
+                        f"Downloading File for Lecture {lecture.number_formatted}"
                     )
 
                 if filename_str not in fragment_totals_cache:
@@ -826,27 +818,45 @@ def download_lecture(
                     )
                     ydl.download([video.url_video, video.url_audio])
                 logger.info(
-                    f"Lecture {lecture.number:02}) '{lecture.title}' downloaded."
+                    f'Lecture {lecture.number_formatted}) "{lecture.title}"" downloaded.'
                 )
             except yt_dlp.utils.DownloadError as e:
                 logger.error(
-                    f"YT-DLP download failed for lecture {lecture.number:02}: {e}"
+                    f"YT-DLP download failed for lecture {lecture.number_formatted}: {e}"
                 )
                 raise RuntimeError(
-                    f"YT-DLP download failed for lecture {lecture.number:02}"
+                    f"YT-DLP download failed for lecture {lecture.number_formatted}"
                 ) from e
             except Exception as e:
                 logger.error(
-                    f"An unexpected error occurred during YT-DLP download for lecture {lecture.number:02}: {e}"
+                    f"An unexpected error occurred during YT-DLP download for lecture {lecture.number_formatted}: {e}"
                 )
                 raise RuntimeError(
-                    f"Unexpected error during YT-DLP download for lecture {lecture.number:02}"
+                    f"Unexpected error during YT-DLP download for lecture {lecture.number_formatted}"
                 ) from e
             except KeyboardInterrupt:
                 logger.warning(
-                    f"Stopped downloading! This program was last downloading Lecture {lecture.number:02}."
+                    f"Stopped downloading! This program was last downloading Lecture {lecture.number_formatted}."
                 )
-                quit()
+                raise Exit(code=0)
+
+                # ##  Cleaned up unneeded leftover files
+                # extensions = ["part", "ytdl"]
+                # found_files = []
+                # # Loop through each extension and extend the list with matching files
+                # for ext_pattern in extensions:
+                #     found_files.extend(
+                #         output_directory.glob(f"{output_file.stem}_000*.{ext_pattern}")
+                #     )
+
+                # file_path: Path
+                # for file_path in found_files:
+                #     if file_path.is_file():
+                #         file_path.unlink()
+
+                # logger.warning(
+                #     f"Stopped downloading Lecture {lecture.number_formatted}. Moving on to Lecture {lecture.number + 1:02}"
+                # )
 
 
 @deprecated("Use the `download_lecture()` function instead.")
@@ -860,6 +870,17 @@ def download_file(
     output_directory: Path,
     write_m3u_to_files: bool = False,
 ):
+    import os
+
+    # from pycaption import (
+    #     DFXPWriter,
+    #     SCCReader,
+    #     SCCWriter,
+    #     SRTReader,
+    #     SRTWriter,
+    #     WebVTTWriter,
+    # )
+
     output_file = get_lecture_output_path(
         course, lecture, output_directory, file_extension="mp4"
     )
@@ -868,10 +889,10 @@ def download_file(
         output_file.parent.mkdir(parents=True)
 
     if video.url_video is None:
-        logger.warning(f"No video link found for Lecture {lecture.number:02}.")
+        logger.warning(f"No video link found for Lecture {lecture.number_formatted}.")
         return
     if video.url_audio is None:
-        logger.warning(f"No audio link found for Lecture {lecture.number:02}.")
+        logger.warning(f"No audio link found for Lecture {lecture.number_formatted}.")
         return
 
     segments_data = session.get(video.url_video, cookies=cookies, headers=HEADERS)
