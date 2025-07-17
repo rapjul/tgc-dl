@@ -96,10 +96,7 @@ class Course:
             string="Guidebook",
         )
         guidebook_tag = soup.find("a", class_="guidebook-btn")
-        if (
-            isinstance(guidebook_tag, Tag)
-            and "Guidebook" in guidebook_tag.get_text(strip=True)
-        ):  # fmt: skip
+        if isinstance(guidebook_tag, Tag) and "Guidebook" in guidebook_tag.get_text():
             guidebook_tag = guidebook_tag.get("href")
         else:
             guidebook_tag = None
@@ -136,6 +133,7 @@ class Course:
         else:
             raise LectureIdNotFound("Could not find any lecture IDs.")
 
+        # Create Course directory path
         self.name_formatted_with_id = f"{self.title} (#{self.ids})"
         self.directory_path = f"{self.name_formatted_with_id} ~ {self.professor_name}"
 
